@@ -6,4 +6,4 @@ Credit card companies handle numerous credit card transactions each day and ther
 
 ## Relevant Links
 
-()[https://nchin212.github.io/Credit_Card_Fraud_Detection/credit.md]
+https://nchin212.github.io/Credit_Card_Fraud_Detection/credit.html
