@@ -2,13 +2,11 @@
 
 ## Synopsis
 
-Credit card companies handle numerous credit card transactions each day and there could be some cases of fraudulent transactions, where customers are charged for items they did not purchase. As such, it is important for companies to detect these fraudulent transactions to improve customer security and build up customer confidence in the company. In this project, we will explore some methods to resolve data imbalance and use logistic regression to classify the transactions as safe or fraudulent.
+Credit card companies handle numerous credit card transactions each day and there could be some cases of fraudulent transactions, where customers are charged for items they did not purchase. As such, it is important for companies to detect these fraudulent transactions to improve customer security and build up customer confidence in the company. In this project, we will explore some methods to resolve data imbalance and use logistic regression, random forest and adaboost to classify the transactions as safe or fraudulent.
 
 ## Data
 
-The dataset is taken from Kaggle and can be obtained [here](https://www.kaggle.com/mlg-ulb/creditcardfraud).
-
-The dataset contains transactions made by credit cards in September 2013 by European cardholders. Features V1, V2, … V28 are the principal components obtained with PCA, the only features which have not been transformed with PCA are 'Time' and 'Amount'. Feature 'Time' contains the seconds elapsed between each transaction and the first transaction in the dataset. The feature 'Amount' is the transaction Amount, this feature can be used for example-dependant cost-senstive learning. The feature 'Class' is the response variable and it takes value 1 in case of fraud and 0 otherwise.
+The dataset is taken from [Kaggle](https://www.kaggle.com/mlg-ulb/creditcardfraud). It contains transactions made by credit cards in September 2013 by European cardholders. Due to confidentiality issues, Kaggle is unable to provide the original features and more background information about the data. Features V1, V2, … V28 are the principal components obtained with PCA, the only features which have not been transformed with PCA are 'Time' and 'Amount'. Feature 'Time' contains the seconds elapsed between each transaction and the first transaction in the dataset. The feature 'Amount' is the transaction amount. The feature 'Class' is the response variable and it takes value 1 in case of fraud and 0 otherwise.
 
 ## Loading in the Data
 
@@ -30,6 +28,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.over_sampling import SMOTE
@@ -231,22 +230,50 @@ credit.shape
 
 
 
-## Data Preparation
+## Exploratory Data Analysis
 
-Separate the output variable from the predictor variables.
+Plot a histogram for each column to check their distributions.
 
 
 ```python
-output_var = credit['Class']
-credit.drop('Class', axis=1, inplace=True)
+credit.hist(bins=30, figsize=(20, 15), color='orange');
 ```
 
-Normalize the 'Amount' column and remove the 'Time' column.
+
+![png](plots/hist1.png)
+
+
+Plot the transaction amounts over time.
+
+
+```python
+credit[['Time','Amount']].set_index('Time').plot(kind='line', color='brown')
+```
+
+
+
+
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f853927b610>
+
+
+
+
+![png](plots/line1.png)
+
+
+## Data Cleaning
+
+Normalize the 'Amount' column and 'Time' column.
 
 
 ```python
 credit['norm_amount'] = StandardScaler().fit_transform(credit['Amount'].values.reshape(-1, 1))
+credit['norm_time'] = StandardScaler().fit_transform(credit['Time'].values.reshape(-1, 1))
 credit.drop(['Time','Amount'],axis=1, inplace=True)
+```
+
+
+```python
 credit.head()
 ```
 
@@ -282,8 +309,6 @@ credit.head()
       <th>V9</th>
       <th>V10</th>
       <th>...</th>
-      <th>V20</th>
-      <th>V21</th>
       <th>V22</th>
       <th>V23</th>
       <th>V24</th>
@@ -291,7 +316,9 @@ credit.head()
       <th>V26</th>
       <th>V27</th>
       <th>V28</th>
+      <th>Class</th>
       <th>norm_amount</th>
+      <th>norm_time</th>
     </tr>
   </thead>
   <tbody>
@@ -308,8 +335,6 @@ credit.head()
       <td>0.363787</td>
       <td>0.090794</td>
       <td>...</td>
-      <td>0.251412</td>
-      <td>-0.018307</td>
       <td>0.277838</td>
       <td>-0.110474</td>
       <td>0.066928</td>
@@ -317,7 +342,9 @@ credit.head()
       <td>-0.189115</td>
       <td>0.133558</td>
       <td>-0.021053</td>
+      <td>0</td>
       <td>0.244964</td>
+      <td>-1.996583</td>
     </tr>
     <tr>
       <th>1</th>
@@ -332,8 +359,6 @@ credit.head()
       <td>-0.255425</td>
       <td>-0.166974</td>
       <td>...</td>
-      <td>-0.069083</td>
-      <td>-0.225775</td>
       <td>-0.638672</td>
       <td>0.101288</td>
       <td>-0.339846</td>
@@ -341,7 +366,9 @@ credit.head()
       <td>0.125895</td>
       <td>-0.008983</td>
       <td>0.014724</td>
+      <td>0</td>
       <td>-0.342475</td>
+      <td>-1.996583</td>
     </tr>
     <tr>
       <th>2</th>
@@ -356,8 +383,6 @@ credit.head()
       <td>-1.514654</td>
       <td>0.207643</td>
       <td>...</td>
-      <td>0.524980</td>
-      <td>0.247998</td>
       <td>0.771679</td>
       <td>0.909412</td>
       <td>-0.689281</td>
@@ -365,7 +390,9 @@ credit.head()
       <td>-0.139097</td>
       <td>-0.055353</td>
       <td>-0.059752</td>
+      <td>0</td>
       <td>1.160686</td>
+      <td>-1.996562</td>
     </tr>
     <tr>
       <th>3</th>
@@ -380,8 +407,6 @@ credit.head()
       <td>-1.387024</td>
       <td>-0.054952</td>
       <td>...</td>
-      <td>-0.208038</td>
-      <td>-0.108300</td>
       <td>0.005274</td>
       <td>-0.190321</td>
       <td>-1.175575</td>
@@ -389,7 +414,9 @@ credit.head()
       <td>-0.221929</td>
       <td>0.062723</td>
       <td>0.061458</td>
+      <td>0</td>
       <td>0.140534</td>
+      <td>-1.996562</td>
     </tr>
     <tr>
       <th>4</th>
@@ -404,8 +431,6 @@ credit.head()
       <td>0.817739</td>
       <td>0.753074</td>
       <td>...</td>
-      <td>0.408542</td>
-      <td>-0.009431</td>
       <td>0.798278</td>
       <td>-0.137458</td>
       <td>0.141267</td>
@@ -413,11 +438,13 @@ credit.head()
       <td>0.502292</td>
       <td>0.219422</td>
       <td>0.215153</td>
+      <td>0</td>
       <td>-0.073403</td>
+      <td>-1.996541</td>
     </tr>
   </tbody>
 </table>
-<p>5 rows × 29 columns</p>
+<p>5 rows × 31 columns</p>
 </div>
 
 
@@ -428,7 +455,7 @@ We count the number of each class as follows:
 
 
 ```python
-class_count = output_var.value_counts()
+class_count = credit['Class'].value_counts()
 class_count
 ```
 
@@ -443,18 +470,18 @@ class_count
 
 
 ```python
-class_count.plot(kind = 'bar')
+class_count.plot(kind = 'bar', color='skyblue')
 ```
 
 
 
 
-    <matplotlib.axes._subplots.AxesSubplot at 0x7fa8f033ea30>
+    <matplotlib.axes._subplots.AxesSubplot at 0x7f84e8a35dc0>
 
 
 
 
-![png](/plots/imbalance_bp.png)
+![png](plots/bar1.png)
 
 
 From the values and plot, there appears to be severe data imbalance. Very few transactions are fraudulent while most of the transactions are safe. This needs to be resolved as predictive models developed using conventional machine learning algorithms could be biased and inaccurate. Such models would have a bias towards classes which have a high number of instances, such as in this case, safe transactions. These models would tend to predict the transactions as safe and treat the fraudulent transactions as noise. Thus, there would be a high probability of misclassification of fraudulent transactions as safe, which is definitely not ideal.
@@ -472,6 +499,10 @@ Split the data into training and test sets. Note that we only perform oversampli
 
 
 ```python
+# Remove 'Class' column
+output_var = credit['Class']
+credit.drop('Class', axis=1, inplace=True)
+# Split the data
 x_train, x_test, y_train, y_test = train_test_split(credit, output_var, test_size=0.3, random_state=42)
 ```
 
@@ -527,9 +558,17 @@ print("After OverSampling, counts of label '0': {} \n".format(sum(y_train_smote=
 
 ## Model Building
 
-Logistic regression will be used to model the data. Logistic Regression is a classification algorithm that is used to predict the probability of a categorical dependent variable. In logistic regression, the dependent variable is a binary variable that contains data coded as 1 or 0, or in this case, fraudulent or safe.
+The following models have been chosen for building:
 
-The model will first be run on the imbalanced data, followed by  the data after oversampling (RandomOverSampler and SMOTE). The models on the 3 different datasets will then be compared.
+- Logistic Regression
+- Random Forest
+- Adaboost
+
+### Logistic Regression
+
+Logistic Regression is a classification algorithm that is used to predict the probability of a categorical dependent variable. In logistic regression, the dependent variable is a binary variable that contains data coded as 1 or 0, or in this case, fraudulent or safe.
+
+The model will first be run on the imbalanced data, followed by  the data after oversampling (RandomOverSampler and SMOTE). 
 
 ### 1) Logistic Regression on imbalanced dataset
 
@@ -540,12 +579,10 @@ Fit the training data into logistic regression and use the model to predict on t
 lg = LogisticRegression()
 lg.fit(x_train, y_train)
 
-y_pred = lg.predict(x_test)
+y_pred_lg = lg.predict(x_test)
 ```
 
-### Evaluation
-
-Plot the confusion matrix. A confusion matrix is a table that is often used to describe the performance of a classification model. It shows the number of true positives, true negatives, false positives and false negatives.
+To evaluate the model, we can plot a confusion matrix. A confusion matrix is a table that is often used to describe the performance of a classification model. It shows the number of true positives, true negatives, false positives and false negatives.
 
 **True Positives (TP)** - Actual class is 1 and predicted class is 1 (safe transactions accurately classified as safe)
 
@@ -557,7 +594,7 @@ Plot the confusion matrix. A confusion matrix is a table that is often used to d
 
 
 ```python
-cm = confusion_matrix(y_test, y_pred)
+cm = confusion_matrix(y_test, y_pred_lg)
 
 # Create graphics for confusion matrix
 labels = ['Safe','Fraudulent']
@@ -572,10 +609,10 @@ plt.show()
 ```
 
 
-![png](/plots/confusion_matrix.png)
+![png](plots/matrix1.png)
 
 
-There appears to be a large number of transactions classified correctly as safe or fraudulent. However, there are 51 false negatives, i.e. fraudulent transactions that were predicted as safe, which the model needs to improve on.
+There appears to be a large number of transactions classified correctly as safe or fraudulent. However, there are 50 false negatives, i.e. fraudulent transactions that were predicted as safe, which the model needs to improve on.
 
 Since this is an imbalanced dataset, we print out the classification report, which shows the accuracy, precision, recall, f1 score and support of the model.
 
@@ -591,22 +628,17 @@ Since this is an imbalanced dataset, we print out the classification report, whi
 
 
 ```python
-accuracy = accuracy_score(y_test, y_pred)
-precision = precision_score(y_test, y_pred)
-recall = recall_score(y_test, y_pred)
-f1 = f1_score(y_test, y_pred)
-
-print(classification_report(y_test, y_pred, digits=5))
+print(classification_report(y_test, y_pred_lg, digits=5))
 ```
 
                   precision    recall  f1-score   support
     
-               0    0.99940   0.99986   0.99963     85307
-               1    0.87629   0.62500   0.72961       136
+               0    0.99941   0.99986   0.99964     85307
+               1    0.87755   0.63235   0.73504       136
     
-        accuracy                        0.99926     85443
-       macro avg    0.93785   0.81243   0.86462     85443
-    weighted avg    0.99921   0.99926   0.99920     85443
+        accuracy                        0.99927     85443
+       macro avg    0.93848   0.81611   0.86734     85443
+    weighted avg    0.99922   0.99927   0.99922     85443
     
 
 
@@ -617,7 +649,7 @@ Now, we plot a Receiver Operating Characteristic (ROC) curve. It plots the true 
 
 ```python
 # Get false positive rate and true positive rate
-fpr, tpr, _ = roc_curve(y_test, y_pred)
+fpr, tpr, _ = roc_curve(y_test, y_pred_lg)
 roc_auc = auc(fpr, tpr)
 
 # Plot ROC curve
@@ -635,7 +667,7 @@ plt.show()
 ```
 
 
-![png](/plots/auc.png)
+![png](plots/auc1.png)
 
 
 ### 2) Logistic Regression on oversampled dataset (RandomOverSampler)
@@ -645,14 +677,12 @@ plt.show()
 lg_ros = LogisticRegression()
 lg_ros.fit(x_train_ros, y_train_ros)
 
-y_pred = lg_ros.predict(x_test)
+y_pred_lg_ros = lg_ros.predict(x_test)
 ```
-
-### Evaluation
 
 
 ```python
-cm = confusion_matrix(y_test, y_pred)
+cm = confusion_matrix(y_test, y_pred_lg_ros)
 
 # Create graphics for confusion matrix
 labels = ['Safe','Fraudulent']
@@ -667,29 +697,24 @@ plt.show()
 ```
 
 
-![png](/plots/confusion_matrix_ros.png)
+![png](plots/matrix2.png)
 
 
 There appears to be 10 false negatives, which is much lower than the unbalanced dataset. However, there are significantly more false positives.
 
 
 ```python
-accuracy_ros = accuracy_score(y_test, y_pred)
-precision_ros = precision_score(y_test, y_pred)
-recall_ros = recall_score(y_test, y_pred)
-f1_ros = f1_score(y_test, y_pred)
-
-print(classification_report(y_test, y_pred, digits=5))
+print(classification_report(y_test, y_pred_lg_ros, digits=5))
 ```
 
                   precision    recall  f1-score   support
     
-               0    0.99988   0.97414   0.98684     85307
-               1    0.05403   0.92647   0.10211       136
+               0    0.99988   0.97466   0.98711     85307
+               1    0.05507   0.92647   0.10396       136
     
-        accuracy                        0.97406     85443
-       macro avg    0.52696   0.95031   0.54447     85443
-    weighted avg    0.99837   0.97406   0.98543     85443
+        accuracy                        0.97458     85443
+       macro avg    0.52747   0.95056   0.54553     85443
+    weighted avg    0.99838   0.97458   0.98570     85443
     
 
 
@@ -698,7 +723,7 @@ As expected, it has a low precision of 0.05 but a high recall of 0.93.
 
 ```python
 # Get false positive rate and true positive rate
-fpr, tpr, _ = roc_curve(y_test, y_pred)
+fpr, tpr, _ = roc_curve(y_test, y_pred_lg_ros)
 roc_auc_ros = auc(fpr, tpr)
 
 # Plot ROC curve
@@ -716,10 +741,8 @@ plt.show()
 ```
 
 
-![png](/plots/auc_ros.png)
+![png](plots/auc2.png)
 
-
-It has an AUC score of 0.95, which is higher than that of the imbalanced dataset.
 
 ### 3) Logistic Regression on oversampled dataset (SMOTE)
 
@@ -728,14 +751,12 @@ It has an AUC score of 0.95, which is higher than that of the imbalanced dataset
 lg_smote = LogisticRegression()
 lg_smote.fit(x_train_smote, y_train_smote)
 
-y_pred = lg_smote.predict(x_test)
+y_pred_lg_smote = lg_smote.predict(x_test)
 ```
-
-### Evaluation
 
 
 ```python
-cm = confusion_matrix(y_test, y_pred)
+cm = confusion_matrix(y_test, y_pred_lg_smote)
 
 # Create graphics for confusion matrix
 labels = ['Safe','Fraudulent']
@@ -750,36 +771,31 @@ plt.show()
 ```
 
 
-![png](/plots/confusion_matrix_smote.png)
+![png](plots/matrix3.png)
 
 
-It has similar false negatives to the oversampled data using RandomOverSampler but higher false positives.
+It has quite similar false negatives to the oversampled data using RandomOverSampler but higher false positives.
 
 
 ```python
-accuracy_smote = accuracy_score(y_test, y_pred)
-precision_smote = precision_score(y_test, y_pred)
-recall_smote = recall_score(y_test, y_pred)
-f1_smote = f1_score(y_test, y_pred)
-
-print(classification_report(y_test, y_pred, digits=5))
+print(classification_report(y_test, y_pred_lg_smote, digits=5))
 ```
 
                   precision    recall  f1-score   support
     
-               0    0.99988   0.97303   0.98627     85307
-               1    0.05192   0.92647   0.09832       136
+               0    0.99989   0.97331   0.98642     85307
+               1    0.05283   0.93382   0.10000       136
     
-        accuracy                        0.97295     85443
-       macro avg    0.52590   0.94975   0.54230     85443
-    weighted avg    0.99837   0.97295   0.98486     85443
+        accuracy                        0.97325     85443
+       macro avg    0.52636   0.95357   0.54321     85443
+    weighted avg    0.99838   0.97325   0.98501     85443
     
 
 
 
 ```python
 # Get false positive rate and true positive rate
-fpr, tpr, _ = roc_curve(y_test, y_pred)
+fpr, tpr, _ = roc_curve(y_test, y_pred_lg_smote)
 roc_auc_smote = auc(fpr, tpr)
 
 # Plot ROC curve
@@ -797,23 +813,207 @@ plt.show()
 ```
 
 
-![png](/plots/auc_smote.png)
+![png](plots/auc3.png)
 
 
-It has similar AUC score to the oversampled data using RandomOverSampler.
+The 3 methods have similar AUC scores.
 
-## Results
+### Random Forest
 
-For a better comparison, we create the following dataframe.
+Random forest builds multiple decision trees and merges them together to get a more accurate and stable prediction. It is usually trained with the “bagging” method, where a combination of learning models is used to increase the overall result.
+
+### 1) Random Forest on imbalanced dataset
+
+Fit the training data into random forest and use the model to predict on the test data.
 
 
 ```python
-data = {'Accuracy' : [accuracy,accuracy_ros,accuracy_smote], 
-        'Precision' : [precision, precision_ros, precision_smote],
-        'Recall' : [recall, recall_ros, recall_smote],
-        'F1' : [f1,f1_ros,f1_smote],
-        'AUC' : [roc_auc,roc_auc_ros,roc_auc_smote]}
-pd.DataFrame(data, index = ['Imbalanced', 'RandomOverSampler', 'SMOTE'])
+rf = RandomForestClassifier(n_estimators = 100, random_state = 42)
+rf.fit(x_train,y_train)
+y_pred_rf =rf.predict(x_test)
+```
+
+
+```python
+print(classification_report(y_test, y_pred_rf, digits=5))
+```
+
+                  precision    recall  f1-score   support
+    
+               0    0.99968   0.99989   0.99979     85307
+               1    0.92373   0.80147   0.85827       136
+    
+        accuracy                        0.99958     85443
+       macro avg    0.96171   0.90068   0.92903     85443
+    weighted avg    0.99956   0.99958   0.99956     85443
+    
+
+
+### 2) Random Forest on oversampled dataset (RandomOverSampler)
+
+
+```python
+rf_ros = RandomForestClassifier(n_estimators = 100, random_state = 42)
+rf_ros.fit(x_train_ros,y_train_ros)
+y_pred_rf_ros =rf_ros.predict(x_test)
+```
+
+
+```python
+print(classification_report(y_test, y_pred_rf_ros, digits=5))
+```
+
+                  precision    recall  f1-score   support
+    
+               0    0.99971   0.99993   0.99982     85307
+               1    0.94872   0.81618   0.87747       136
+    
+        accuracy                        0.99964     85443
+       macro avg    0.97421   0.90805   0.93864     85443
+    weighted avg    0.99963   0.99964   0.99962     85443
+    
+
+
+### 3) Random Forest on oversampled dataset (SMOTE)
+
+
+```python
+rf_smote = RandomForestClassifier(n_estimators = 100, random_state = 42)
+rf_smote.fit(x_train_smote,y_train_smote)
+y_pred_rf_smote =rf_smote.predict(x_test)
+```
+
+
+```python
+print(classification_report(y_test, y_pred_rf_smote, digits=5))
+```
+
+                  precision    recall  f1-score   support
+    
+               0    0.99979   0.99973   0.99976     85307
+               1    0.83688   0.86765   0.85199       136
+    
+        accuracy                        0.99952     85443
+       macro avg    0.91833   0.93369   0.92587     85443
+    weighted avg    0.99953   0.99952   0.99952     85443
+    
+
+
+### Adaboost
+
+Adaboost (Adaptive Boosting) is a boosting algorithm which converts weak learner to strong learners. A detailed explanation of how this algorithm works can be found [here](https://www.analyticsvidhya.com/blog/2015/11/quick-introduction-boosting-algorithms-machine-learning).
+
+### 1) Adaboost on imbalanced dataset
+
+
+```python
+ada = AdaBoostClassifier(n_estimators = 100, random_state = 42)
+ada.fit(x_train,y_train)
+y_pred_ada = ada.predict(x_test)
+```
+
+
+```python
+print(classification_report(y_test, y_pred_ada, digits=5))
+```
+
+                  precision    recall  f1-score   support
+    
+               0    0.99967   0.99981   0.99974     85307
+               1    0.87097   0.79412   0.83077       136
+    
+        accuracy                        0.99949     85443
+       macro avg    0.93532   0.89697   0.91526     85443
+    weighted avg    0.99947   0.99949   0.99947     85443
+    
+
+
+### 2) Adaboost on oversampled dataset (RandomOverSampler)
+
+
+```python
+ada_ros = AdaBoostClassifier(n_estimators = 100, random_state = 42)
+ada_ros.fit(x_train_ros,y_train_ros)
+y_pred_ada_ros =ada_ros.predict(x_test)
+```
+
+
+```python
+print(classification_report(y_test, y_pred_ada_ros, digits=5))
+```
+
+                  precision    recall  f1-score   support
+    
+               0    0.99988   0.98985   0.99484     85307
+               1    0.12702   0.92647   0.22340       136
+    
+        accuracy                        0.98975     85443
+       macro avg    0.56345   0.95816   0.60912     85443
+    weighted avg    0.99849   0.98975   0.99361     85443
+    
+
+
+### 3) Adaboost on oversampled dataset (SMOTE)
+
+
+```python
+ada_smote = AdaBoostClassifier(n_estimators = 100, random_state = 42)
+ada_smote.fit(x_train_smote,y_train_smote)
+y_pred_ada_smote = ada_smote.predict(x_test)
+```
+
+
+```python
+print(classification_report(y_test, y_pred_ada_smote, digits=5))
+```
+
+                  precision    recall  f1-score   support
+    
+               0    0.99990   0.98349   0.99163     85307
+               1    0.08333   0.94118   0.15311       136
+    
+        accuracy                        0.98343     85443
+       macro avg    0.54162   0.96234   0.57237     85443
+    weighted avg    0.99845   0.98343   0.99030     85443
+    
+
+
+## Results
+
+Create a function to plot the results in a table.
+
+
+```python
+def classification_table(y_test, *args):
+    df = pd.DataFrame(columns=['Accuracy','Precision','Recall','F1-score'])
+    for y_pred in args:
+        accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
+        recall = recall_score(y_test, y_pred)
+        f1 = f1_score(y_test, y_pred)
+        
+        # AUC score
+        fpr, tpr, _ = roc_curve(y_test, y_pred)
+        roc_auc = auc(fpr, tpr)
+        
+        df = df.append({'Accuracy': accuracy, 'Precision': precision, 'Recall': recall, 'F1-score': f1, 'AUC': roc_auc}, ignore_index=True)
+    return df
+```
+
+
+```python
+combined = classification_table(y_test, 
+                                y_pred_lg, y_pred_lg_ros, y_pred_lg_smote, 
+                                y_pred_rf, y_pred_rf_ros, y_pred_rf_smote, 
+                                y_pred_ada, y_pred_ada_ros, y_pred_ada_smote)
+combined.index = ['LogReg Imbalanced', 'LogReg RandomOverSampler','LogReg SMOTE',
+                  'RF Imbalanced', 'RF RandomOverSampler','RF SMOTE',
+                  'Ada Imbalanced', 'Ada RandomOverSampler','Ada SMOTE']
+```
+
+
+```python
+combined
 ```
 
 
@@ -840,34 +1040,82 @@ pd.DataFrame(data, index = ['Imbalanced', 'RandomOverSampler', 'SMOTE'])
       <th>Accuracy</th>
       <th>Precision</th>
       <th>Recall</th>
-      <th>F1</th>
+      <th>F1-score</th>
       <th>AUC</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>Imbalanced</th>
-      <td>0.999263</td>
-      <td>0.876289</td>
-      <td>0.625000</td>
-      <td>0.729614</td>
-      <td>0.812430</td>
+      <th>LogReg Imbalanced</th>
+      <td>0.999274</td>
+      <td>0.877551</td>
+      <td>0.632353</td>
+      <td>0.735043</td>
+      <td>0.816106</td>
     </tr>
     <tr>
-      <th>RandomOverSampler</th>
-      <td>0.974065</td>
-      <td>0.054031</td>
+      <th>LogReg RandomOverSampler</th>
+      <td>0.974580</td>
+      <td>0.055070</td>
       <td>0.926471</td>
-      <td>0.102107</td>
-      <td>0.950306</td>
+      <td>0.103960</td>
+      <td>0.950563</td>
     </tr>
     <tr>
-      <th>SMOTE</th>
-      <td>0.972953</td>
-      <td>0.051916</td>
+      <th>LogReg SMOTE</th>
+      <td>0.973245</td>
+      <td>0.052829</td>
+      <td>0.933824</td>
+      <td>0.100000</td>
+      <td>0.953566</td>
+    </tr>
+    <tr>
+      <th>RF Imbalanced</th>
+      <td>0.999579</td>
+      <td>0.923729</td>
+      <td>0.801471</td>
+      <td>0.858268</td>
+      <td>0.900683</td>
+    </tr>
+    <tr>
+      <th>RF RandomOverSampler</th>
+      <td>0.999637</td>
+      <td>0.948718</td>
+      <td>0.816176</td>
+      <td>0.877470</td>
+      <td>0.908053</td>
+    </tr>
+    <tr>
+      <th>RF SMOTE</th>
+      <td>0.999520</td>
+      <td>0.836879</td>
+      <td>0.867647</td>
+      <td>0.851986</td>
+      <td>0.933689</td>
+    </tr>
+    <tr>
+      <th>Ada Imbalanced</th>
+      <td>0.999485</td>
+      <td>0.870968</td>
+      <td>0.794118</td>
+      <td>0.830769</td>
+      <td>0.896965</td>
+    </tr>
+    <tr>
+      <th>Ada RandomOverSampler</th>
+      <td>0.989748</td>
+      <td>0.127016</td>
       <td>0.926471</td>
-      <td>0.098322</td>
-      <td>0.949749</td>
+      <td>0.223404</td>
+      <td>0.958160</td>
+    </tr>
+    <tr>
+      <th>Ada SMOTE</th>
+      <td>0.983428</td>
+      <td>0.083333</td>
+      <td>0.941176</td>
+      <td>0.153110</td>
+      <td>0.962336</td>
     </tr>
   </tbody>
 </table>
@@ -875,4 +1123,41 @@ pd.DataFrame(data, index = ['Imbalanced', 'RandomOverSampler', 'SMOTE'])
 
 
 
-It would appear that the imbalanced dataset performs better overall based on the F1 score. However, if the cost of false positives is not too high, the company may consider using the model fitted with RandomOverSampler, since it predicts less false negatives so less fraudulent transactions will be passed off as safe.
+Since this is an unbalanced dataset, accuracy is not the correct metric to use to compare the models as the models will tend to predict the majority class, resulting in high accuracy rates even though the minority class has been classified wrongly. Instead, we should compare the models using their f1-scores.
+
+
+```python
+fig, ax = plt.subplots(figsize=(10, 8))
+x = np.arange(3)
+bar_width = 0.2
+b1 = ax.bar(x, combined.loc[combined.index.str.contains('Imbalanced'), 'F1-score'],
+            width=bar_width, label = 'Imbalanced', color='deepskyblue', edgecolor='black')
+b2 = ax.bar(x + bar_width, combined.loc[combined.index.str.contains('RandomOverSampler'), 'F1-score'],
+            width=bar_width, label= ' RandomOverSampler', color='limegreen', edgecolor='black')
+b3 = ax.bar(x + 2*bar_width, combined.loc[combined.index.str.contains('SMOTE'), 'F1-score'],
+            width=bar_width, label= ' SMOTE', color='darkorange', edgecolor='black')
+
+# Add legend
+ax.legend()
+
+# Fix x-axis labels
+ax.set_xticks(x + bar_width)
+ax.set_xticklabels(['Logistic Regression','Random Forest', 'AdaBoost'])
+
+# Add axis and chart labels.
+ax.set_ylabel('F1-score')
+ax.set_title('F1-score by Model and Oversampling Technique', pad=15)
+```
+
+
+
+
+    Text(0.5, 1.0, 'F1-score by Model and Oversampling Technique')
+
+
+
+
+![png](bar2.png)
+
+
+Both logistic regression and adaBoost appear to perform very well on the imbalanced dataset but not on the oversampled datasets. Random forest performs very well overall and the best model performance is random forest with RandomOverSampler with a f1-score of 87.7%. However, one may consider comparing the models using recall as companies would want the model to be sensitive to fraudulent transactions and have a low number of false negatives. In that case, adaboost with SMOTE would be the best model with a recall of 94.1%.
