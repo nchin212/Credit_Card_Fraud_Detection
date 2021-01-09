@@ -1157,7 +1157,7 @@ ax.set_title('F1-score by Model and Oversampling Technique', pad=15)
 
 
 
-![png](bar2.png)
+![png](plots/bar2.png)
 
 
 Both logistic regression and adaBoost appear to perform very well on the imbalanced dataset but not on the oversampled datasets. Random forest performs very well overall and the best model performance is random forest with RandomOverSampler with a f1-score of 87.7%. However, one may consider comparing the models using recall as companies would want the model to be sensitive to fraudulent transactions and have a low number of false negatives. In that case, adaboost with SMOTE would be the best model with a recall of 94.1%.
